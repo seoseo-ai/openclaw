@@ -17,6 +17,8 @@ import type {
   OpenClawPluginServiceContext,
   OpenClawPluginToolContext,
   OpenClawPluginToolFactory,
+  PluginHookSessionsSendEvent,
+  PluginHookSessionsSendResult,
   PluginLogger,
   ProviderAugmentModelCatalogContext,
   ProviderAuthContext,
@@ -139,6 +141,8 @@ export type {
   ProviderAuthResult,
   OpenClawPluginCommandDefinition,
   OpenClawPluginDefinition,
+  PluginHookSessionsSendEvent,
+  PluginHookSessionsSendResult,
   PluginLogger,
 };
 export type { ProviderRuntimeModel } from "../plugins/provider-runtime-model.types.js";

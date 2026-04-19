@@ -2,8 +2,10 @@ import os from "node:os";
 import path from "node:path";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChannelMessagingAdapter } from "../../channels/plugins/types.js";
+import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { createTestRegistry } from "../../test-utils/channel-plugins.js";
 import { extractAssistantText, sanitizeTextContent } from "./sessions-helpers.js";
+import { runSessionsSendA2AFlow } from "./sessions-send-tool.a2a.js";
 
 const callGatewayMock = vi.fn();
 vi.mock("../../gateway/call.js", () => ({
@@ -34,6 +36,18 @@ vi.mock("../../config/config.js", async () => {
 vi.mock("./sessions-send-tool.a2a.js", () => ({
   runSessionsSendA2AFlow: vi.fn(),
 }));
+vi.mock("../../plugins/hook-runner-global.js", async () => {
+  const actual = await vi.importActual<typeof import("../../plugins/hook-runner-global.js")>(
+    "../../plugins/hook-runner-global.js",
+  );
+  return {
+    ...actual,
+    getGlobalHookRunner: vi.fn(),
+  };
+});
+
+const mockGetGlobalHookRunner = vi.mocked(getGlobalHookRunner);
+const mockRunSessionsSendA2AFlow = vi.mocked(runSessionsSendA2AFlow);
 
 let createSessionsListTool: typeof import("./sessions-list-tool.js").createSessionsListTool;
 let createSessionsSendTool: typeof import("./sessions-send-tool.js").createSessionsSendTool;
@@ -218,6 +232,12 @@ beforeEach(() => {
     tools: { agentToAgent: { enabled: false } },
   });
   setActivePluginRegistry(createTestRegistry([]));
+  mockRunSessionsSendA2AFlow.mockReset();
+  mockGetGlobalHookRunner.mockReset();
+  mockGetGlobalHookRunner.mockReturnValue({
+    hasHooks: vi.fn(() => false),
+    runSessionsSend: vi.fn(),
+  } as never);
 });
 
 describe("extractAssistantText", () => {
@@ -699,6 +719,216 @@ describe("sessions_send gating", () => {
       status: "ok",
       reply: undefined,
       sessionKey: MAIN_AGENT_SESSION_KEY,
+    });
+  });
+
+  it("continues with the direct sessions_send path when the hook declines", async () => {
+    const hookRunner = {
+      hasHooks: vi.fn((hookName?: string) => hookName === "sessions_send"),
+      runSessionsSend: vi.fn().mockResolvedValue({
+        handled: false,
+        reason: "broker disabled",
+      }),
+    };
+    mockGetGlobalHookRunner.mockReturnValue(hookRunner as never);
+    let chatHistoryCalls = 0;
+    callGatewayMock.mockImplementation(async (opts: unknown) => {
+      const request = opts as { method?: string };
+      if (request.method === "sessions.list") {
+        return {
+          path: "/tmp/sessions.json",
+          sessions: [{ key: MAIN_AGENT_SESSION_KEY, kind: "direct" }],
+        };
+      }
+      if (request.method === "agent") {
+        return { runId: "run-direct-1", acceptedAt: 123 };
+      }
+      if (request.method === "agent.wait") {
+        return { runId: "run-direct-1", status: "ok" };
+      }
+      if (request.method === "chat.history") {
+        chatHistoryCalls += 1;
+        return chatHistoryCalls === 1
+          ? { messages: [] }
+          : {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [{ type: "text", text: "direct reply" }],
+                  timestamp: 20,
+                },
+              ],
+            };
+      }
+      return {};
+    });
+
+    const tool = createMainSessionsSendTool();
+    const result = await tool.execute("call-hook-declined", {
+      sessionKey: MAIN_AGENT_SESSION_KEY,
+      message: "delegate me",
+      timeoutSeconds: 1,
+      task: {
+        intent: "delegate",
+        instructions: "Use the broker if enabled.",
+        requester: {
+          sessionKey: "agent:broker:req",
+          channel: "slack",
+        },
+        runtime: {
+          waitRunId: "wait-from-input",
+          roundOneReply: "prefilled reply",
+          announceTimeoutMs: 4567,
+          maxPingPongTurns: 4,
+          cancelTarget: {
+            kind: "session_run",
+            sessionKey: "agent:broker:cancel",
+            runId: "cancel-run-1",
+          },
+        },
+        correlationId: "corr-1",
+        parentRunId: "parent-1",
+      },
+    });
+
+    expect(result.details).toMatchObject({
+      status: "ok",
+      reply: "direct reply",
+      sessionKey: MAIN_AGENT_SESSION_KEY,
+    });
+    expect(hookRunner.runSessionsSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionKey: MAIN_AGENT_SESSION_KEY,
+        target: {
+          sessionKey: MAIN_AGENT_SESSION_KEY,
+          displayKey: MAIN_AGENT_SESSION_KEY,
+        },
+        message: "delegate me",
+        task: expect.objectContaining({
+          intent: "delegate",
+          instructions: "Use the broker if enabled.",
+          constraints: expect.objectContaining({ timeoutSeconds: 1 }),
+          requester: {
+            sessionKey: "agent:broker:req",
+            channel: "slack",
+          },
+          runtime: {
+            waitRunId: "wait-from-input",
+            roundOneReply: "prefilled reply",
+            announceTimeoutMs: 4567,
+            maxPingPongTurns: 4,
+            cancelTarget: {
+              kind: "session_run",
+              sessionKey: "agent:broker:cancel",
+              runId: "cancel-run-1",
+            },
+          },
+          correlationId: "corr-1",
+          parentRunId: "parent-1",
+        }),
+        rawParams: expect.objectContaining({
+          task: expect.any(Object),
+        }),
+      }),
+      expect.objectContaining({
+        toolName: "sessions_send",
+        toolCallId: "call-hook-declined",
+        sessionKey: MAIN_AGENT_SESSION_KEY,
+      }),
+    );
+    expect(callGatewayMock.mock.calls.some((call) => call[0]?.method === "agent")).toBe(true);
+  });
+
+  it("uses delegated hook dispatch data without starting the direct nested run", async () => {
+    const hookRunner = {
+      hasHooks: vi.fn((hookName?: string) => hookName === "sessions_send"),
+      runSessionsSend: vi.fn().mockResolvedValue({
+        handled: true,
+        mode: "delegated",
+        dispatch: {
+          kind: "a2a-broker",
+          taskId: "broker-task-1",
+          waitRunId: "broker-wait-1",
+          cancelTarget: {
+            kind: "session_run",
+            sessionKey: "agent:broker:cancel",
+            runId: "cancel-run-2",
+          },
+        },
+      }),
+    };
+    mockGetGlobalHookRunner.mockReturnValue(hookRunner as never);
+    let chatHistoryCalls = 0;
+    callGatewayMock.mockImplementation(async (opts: unknown) => {
+      const request = opts as { method?: string };
+      if (request.method === "sessions.list") {
+        return {
+          path: "/tmp/sessions.json",
+          sessions: [{ key: MAIN_AGENT_SESSION_KEY, kind: "direct" }],
+        };
+      }
+      if (request.method === "agent") {
+        throw new Error("direct nested run should not start for delegated hook dispatch");
+      }
+      if (request.method === "agent.wait") {
+        return { runId: "broker-wait-1", status: "ok" };
+      }
+      if (request.method === "chat.history") {
+        chatHistoryCalls += 1;
+        return chatHistoryCalls === 1
+          ? { messages: [] }
+          : {
+              messages: [
+                {
+                  role: "assistant",
+                  content: [{ type: "text", text: "delegated reply" }],
+                  timestamp: 20,
+                },
+              ],
+            };
+      }
+      return {};
+    });
+
+    const tool = createMainSessionsSendTool();
+    const result = await tool.execute("call-hook-delegated", {
+      sessionKey: MAIN_AGENT_SESSION_KEY,
+      message: "delegate this one",
+      timeoutSeconds: 1,
+      task: {
+        intent: "delegate",
+        requester: {
+          sessionKey: "agent:broker:req",
+          channel: "discord",
+        },
+        constraints: {
+          timeoutSeconds: 2,
+          maxPingPongTurns: 3,
+        },
+        runtime: {
+          announceTimeoutMs: 2222,
+        },
+      },
+    });
+
+    expect(result.details).toMatchObject({
+      status: "ok",
+      runId: "broker-wait-1",
+      reply: "delegated reply",
+      sessionKey: MAIN_AGENT_SESSION_KEY,
+      delivery: { status: "pending", mode: "announce" },
+    });
+    expect(callGatewayMock.mock.calls.some((call) => call[0]?.method === "agent")).toBe(false);
+    expect(mockRunSessionsSendA2AFlow).toHaveBeenCalledWith({
+      targetSessionKey: MAIN_AGENT_SESSION_KEY,
+      displayKey: MAIN_AGENT_SESSION_KEY,
+      message: "delegate this one",
+      announceTimeoutMs: 2222,
+      maxPingPongTurns: 3,
+      requesterSessionKey: "agent:broker:req",
+      requesterChannel: "discord",
+      roundOneReply: "delegated reply",
+      waitRunId: "broker-wait-1",
     });
   });
 });

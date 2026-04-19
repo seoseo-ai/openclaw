@@ -23,6 +23,8 @@ import type {
   PluginHookReplyDispatchContext,
   PluginHookReplyDispatchEvent,
   PluginHookReplyDispatchResult,
+  PluginHookSessionsSendEvent,
+  PluginHookSessionsSendResult,
   PluginHookBeforeModelResolveEvent,
   PluginHookBeforeModelResolveResult,
   PluginHookBeforePromptBuildEvent,
@@ -80,6 +82,8 @@ export type {
   PluginHookReplyDispatchContext,
   PluginHookReplyDispatchEvent,
   PluginHookReplyDispatchResult,
+  PluginHookSessionsSendEvent,
+  PluginHookSessionsSendResult,
   PluginHookBeforeModelResolveEvent,
   PluginHookBeforeModelResolveResult,
   PluginHookBeforePromptBuildEvent,
@@ -729,6 +733,48 @@ export function createHookRunner(
   }
 
   /**
+   * Run sessions_send hook.
+   * Allows plugins to intercept sessions_send direct/delegated dispatch.
+   * Returns the first handled result; if all handlers decline, preserves the
+   * highest-priority decline result so callers can distinguish "declined" from
+   * "no hook registered".
+   */
+  async function runSessionsSend(
+    event: PluginHookSessionsSendEvent,
+    ctx: PluginHookToolContext,
+  ): Promise<PluginHookSessionsSendResult | undefined> {
+    const hooks = getHooksForName(registry, "sessions_send");
+    if (hooks.length === 0) {
+      return undefined;
+    }
+
+    logger?.debug?.(`[hooks] running sessions_send (${hooks.length} handlers, tri-state)`);
+
+    let declined: Extract<PluginHookSessionsSendResult, { handled: false }> | undefined;
+    for (const hook of hooks) {
+      try {
+        const handlerResult = await (
+          hook.handler as (
+            event: unknown,
+            ctx: unknown,
+          ) => Promise<PluginHookSessionsSendResult | void>
+        )(event, ctx);
+        if (!handlerResult) {
+          continue;
+        }
+        if (handlerResult.handled) {
+          return handlerResult;
+        }
+        declined ??= handlerResult;
+      } catch (err) {
+        handleHookError({ hookName: "sessions_send", pluginId: hook.pluginId, error: err });
+      }
+    }
+
+    return declined;
+  }
+
+  /**
    * Run message_sending hook.
    * Allows plugins to modify or cancel outgoing messages.
    * Runs sequentially.
@@ -1127,6 +1173,7 @@ export function createHookRunner(
     runMessageReceived,
     runBeforeDispatch,
     runReplyDispatch,
+    runSessionsSend,
     runMessageSending,
     runMessageSent,
     // Tool hooks

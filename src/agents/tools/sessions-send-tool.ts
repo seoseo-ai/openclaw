@@ -3,6 +3,8 @@ import { Type } from "@sinclair/typebox";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { callGateway } from "../../gateway/call.js";
 import { formatErrorMessage } from "../../infra/errors.js";
+import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
+import type { PluginHookSessionsSendEvent } from "../../plugins/hook-types.js";
 import { normalizeAgentId, resolveAgentIdFromSessionKey } from "../../routing/session-key.js";
 import { SESSION_LABEL_MAX_LENGTH } from "../../sessions/session-label.js";
 import { normalizeOptionalString } from "../../shared/string-coerce.js";
@@ -38,6 +40,7 @@ const SessionsSendToolSchema = Type.Object({
   agentId: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
   message: Type.String(),
   timeoutSeconds: Type.Optional(Type.Number({ minimum: 0 })),
+  task: Type.Optional(Type.Unknown()),
 });
 
 type GatewayCaller = typeof callGateway;
@@ -72,6 +75,129 @@ async function startAgentRun(params: {
       }),
     };
   }
+}
+
+function readOptionalRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
+}
+
+function readOptionalNonNegativeInteger(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+  const normalized = Math.floor(value);
+  return normalized >= 0 ? normalized : undefined;
+}
+
+function readOptionalPositiveInteger(value: unknown): number | undefined {
+  const normalized = readOptionalNonNegativeInteger(value);
+  return normalized && normalized > 0 ? normalized : undefined;
+}
+
+function buildSessionsSendHookTask(params: {
+  rawParams: Record<string, unknown>;
+  timeoutSeconds: number;
+  announceTimeoutMs: number;
+  maxPingPongTurns: number;
+  requesterSessionKey?: string;
+  requesterChannel?: GatewayMessageChannel;
+}): PluginHookSessionsSendEvent["task"] | undefined {
+  const rawTask = readOptionalRecord(params.rawParams.task);
+  if (!rawTask) {
+    return undefined;
+  }
+
+  const rawConstraints = readOptionalRecord(rawTask.constraints);
+  const rawRuntime = readOptionalRecord(rawTask.runtime);
+  const rawRequester = readOptionalRecord(rawTask.requester);
+  const timeoutSeconds =
+    readOptionalNonNegativeInteger(rawConstraints?.timeoutSeconds) ?? params.timeoutSeconds;
+  const constraintMaxPingPongTurns =
+    readOptionalNonNegativeInteger(rawConstraints?.maxPingPongTurns) ?? params.maxPingPongTurns;
+  const runtimeMaxPingPongTurns =
+    readOptionalNonNegativeInteger(rawRuntime?.maxPingPongTurns) ?? constraintMaxPingPongTurns;
+  const announceTimeoutMs =
+    readOptionalPositiveInteger(rawRuntime?.announceTimeoutMs) ??
+    (timeoutSeconds === 0 ? 30_000 : timeoutSeconds * 1000);
+  const cancelTargetRecord = readOptionalRecord(rawRuntime?.cancelTarget);
+  const requesterSessionKey =
+    normalizeOptionalString(rawRequester?.sessionKey) ?? params.requesterSessionKey;
+  const requesterChannel =
+    normalizeOptionalString(rawRequester?.channel) ?? params.requesterChannel;
+  const waitRunId = normalizeOptionalString(rawRuntime?.waitRunId);
+  const roundOneReply = normalizeOptionalString(rawRuntime?.roundOneReply);
+  const intent = normalizeOptionalString(rawTask.intent);
+  const instructions = normalizeOptionalString(rawTask.instructions);
+  const correlationId = normalizeOptionalString(rawTask.correlationId);
+  const parentRunId = normalizeOptionalString(rawTask.parentRunId);
+  const cancelTarget = cancelTargetRecord
+    ? {
+        ...(normalizeOptionalString(cancelTargetRecord.kind)
+          ? { kind: normalizeOptionalString(cancelTargetRecord.kind) }
+          : {}),
+        ...(normalizeOptionalString(cancelTargetRecord.sessionKey)
+          ? { sessionKey: normalizeOptionalString(cancelTargetRecord.sessionKey) }
+          : {}),
+        ...(normalizeOptionalString(cancelTargetRecord.runId)
+          ? { runId: normalizeOptionalString(cancelTargetRecord.runId) }
+          : {}),
+      }
+    : undefined;
+
+  return {
+    ...(intent ? { intent } : {}),
+    ...(instructions ? { instructions } : {}),
+    constraints: {
+      timeoutSeconds,
+      maxPingPongTurns: constraintMaxPingPongTurns,
+    },
+    runtime: {
+      ...(waitRunId ? { waitRunId } : {}),
+      ...(roundOneReply ? { roundOneReply } : {}),
+      ...(announceTimeoutMs ? { announceTimeoutMs } : {}),
+      ...(runtimeMaxPingPongTurns >= 0 ? { maxPingPongTurns: runtimeMaxPingPongTurns } : {}),
+      ...(cancelTarget ? { cancelTarget } : {}),
+    },
+    ...(requesterSessionKey || requesterChannel
+      ? {
+          requester: {
+            ...(requesterSessionKey ? { sessionKey: requesterSessionKey } : {}),
+            ...(requesterChannel ? { channel: requesterChannel } : {}),
+          },
+        }
+      : {}),
+    ...(correlationId ? { correlationId } : {}),
+    ...(parentRunId ? { parentRunId } : {}),
+  };
+}
+
+function resolveSessionsSendDelegatedRuntime(params: {
+  task: PluginHookSessionsSendEvent["task"];
+  timeoutSeconds: number;
+  announceTimeoutMs: number;
+  maxPingPongTurns: number;
+  requesterSessionKey?: string;
+  requesterChannel?: GatewayMessageChannel;
+}) {
+  const timeoutSeconds = params.task?.constraints?.timeoutSeconds ?? params.timeoutSeconds;
+  const runtimeMaxPingPongTurns =
+    params.task?.runtime?.maxPingPongTurns ??
+    params.task?.constraints?.maxPingPongTurns ??
+    params.maxPingPongTurns;
+  return {
+    timeoutSeconds,
+    announceTimeoutMs: params.task?.runtime?.announceTimeoutMs ?? params.announceTimeoutMs,
+    maxPingPongTurns: runtimeMaxPingPongTurns,
+    requesterSessionKey: params.task?.requester?.sessionKey ?? params.requesterSessionKey,
+    requesterChannel:
+      (params.task?.requester?.channel as GatewayMessageChannel | undefined) ??
+      params.requesterChannel,
+    roundOneReply: params.task?.runtime?.roundOneReply,
+    waitRunId: params.task?.runtime?.waitRunId,
+  };
 }
 
 export function createSessionsSendTool(opts?: {
@@ -252,12 +378,32 @@ export function createSessionsSendTool(opts?: {
         });
       }
 
+      const requesterSessionKey = opts?.agentSessionKey;
+      const requesterChannel = opts?.agentChannel;
+      const maxPingPongTurns = resolvePingPongTurns(cfg);
+      const sessionsSendHookTask = buildSessionsSendHookTask({
+        rawParams: params,
+        timeoutSeconds,
+        announceTimeoutMs,
+        maxPingPongTurns,
+        requesterSessionKey,
+        requesterChannel,
+      });
+      const delegatedRuntime = resolveSessionsSendDelegatedRuntime({
+        task: sessionsSendHookTask,
+        timeoutSeconds,
+        announceTimeoutMs,
+        maxPingPongTurns,
+        requesterSessionKey,
+        requesterChannel,
+      });
+
       // Capture the pre-run assistant snapshot before starting the nested run.
       // Fast in-process test doubles and short-circuit agent paths can finish
       // before we reach the post-run read, which would otherwise make the new
       // reply look like the baseline and hide it from the caller.
       const baselineReply =
-        timeoutSeconds === 0
+        timeoutSeconds === 0 && delegatedRuntime.timeoutSeconds === 0
           ? undefined
           : await readLatestAssistantReplySnapshot({
               sessionKey: resolvedKey,
@@ -285,23 +431,118 @@ export function createSessionsSendTool(opts?: {
           sourceTool: "sessions_send",
         },
       };
-      const requesterSessionKey = opts?.agentSessionKey;
-      const requesterChannel = opts?.agentChannel;
-      const maxPingPongTurns = resolvePingPongTurns(cfg);
       const delivery = { status: "pending", mode: "announce" as const };
-      const startA2AFlow = (roundOneReply?: string, waitRunId?: string) => {
+      const startA2AFlow = (params?: {
+        roundOneReply?: string;
+        waitRunId?: string;
+        announceTimeoutMs?: number;
+        maxPingPongTurns?: number;
+        requesterSessionKey?: string;
+        requesterChannel?: GatewayMessageChannel;
+      }) => {
         void runSessionsSendA2AFlow({
           targetSessionKey: resolvedKey,
           displayKey,
           message,
-          announceTimeoutMs,
-          maxPingPongTurns,
-          requesterSessionKey,
-          requesterChannel,
-          roundOneReply,
-          waitRunId,
+          announceTimeoutMs: params?.announceTimeoutMs ?? announceTimeoutMs,
+          maxPingPongTurns: params?.maxPingPongTurns ?? maxPingPongTurns,
+          requesterSessionKey: params?.requesterSessionKey ?? requesterSessionKey,
+          requesterChannel: params?.requesterChannel ?? requesterChannel,
+          roundOneReply: params?.roundOneReply,
+          waitRunId: params?.waitRunId,
         });
       };
+      const hookRunner = getGlobalHookRunner();
+      const sessionsSendHookEvent: PluginHookSessionsSendEvent = {
+        sessionKey: resolvedKey,
+        target: {
+          sessionKey: resolvedKey,
+          displayKey,
+        },
+        message,
+        ...(sessionsSendHookTask ? { task: sessionsSendHookTask } : {}),
+        rawParams: params,
+      };
+
+      if (hookRunner?.hasHooks("sessions_send")) {
+        const hookResult = await hookRunner.runSessionsSend(sessionsSendHookEvent, {
+          toolName: "sessions_send",
+          toolCallId: _toolCallId,
+          sessionKey: requesterSessionKey,
+        });
+        if (hookResult?.handled) {
+          if (hookResult.mode === "direct") {
+            return jsonResult(hookResult.result);
+          }
+
+          const delegatedRunId =
+            hookResult.dispatch.waitRunId ??
+            delegatedRuntime.waitRunId ??
+            hookResult.dispatch.taskId;
+
+          if (delegatedRuntime.timeoutSeconds === 0) {
+            runId = delegatedRunId;
+            startA2AFlow({
+              roundOneReply: delegatedRuntime.roundOneReply,
+              waitRunId: delegatedRunId,
+              announceTimeoutMs: delegatedRuntime.announceTimeoutMs,
+              maxPingPongTurns: delegatedRuntime.maxPingPongTurns,
+              requesterSessionKey: delegatedRuntime.requesterSessionKey,
+              requesterChannel: delegatedRuntime.requesterChannel,
+            });
+            return jsonResult({
+              runId,
+              status: "accepted",
+              sessionKey: displayKey,
+              delivery,
+            });
+          }
+
+          runId = delegatedRunId;
+          const delegatedResult = await waitForAgentRunAndReadUpdatedAssistantReply({
+            runId,
+            sessionKey: resolvedKey,
+            timeoutMs: delegatedRuntime.timeoutSeconds * 1000,
+            limit: SESSIONS_SEND_REPLY_HISTORY_LIMIT,
+            baseline: baselineReply,
+            callGateway: gatewayCall,
+          });
+
+          if (delegatedResult.status === "timeout") {
+            return jsonResult({
+              runId,
+              status: "timeout",
+              error: delegatedResult.error,
+              sessionKey: displayKey,
+            });
+          }
+          if (delegatedResult.status === "error") {
+            return jsonResult({
+              runId,
+              status: "error",
+              error: delegatedResult.error ?? "agent error",
+              sessionKey: displayKey,
+            });
+          }
+
+          const reply = delegatedResult.replyText;
+          startA2AFlow({
+            roundOneReply: reply ?? delegatedRuntime.roundOneReply,
+            waitRunId: delegatedRunId,
+            announceTimeoutMs: delegatedRuntime.announceTimeoutMs,
+            maxPingPongTurns: delegatedRuntime.maxPingPongTurns,
+            requesterSessionKey: delegatedRuntime.requesterSessionKey,
+            requesterChannel: delegatedRuntime.requesterChannel,
+          });
+          return jsonResult({
+            runId,
+            status: "ok",
+            reply,
+            sessionKey: displayKey,
+            delivery,
+          });
+        }
+      }
 
       if (timeoutSeconds === 0) {
         const start = await startAgentRun({
@@ -314,7 +555,7 @@ export function createSessionsSendTool(opts?: {
           return start.result;
         }
         runId = start.runId;
-        startA2AFlow(undefined, runId);
+        startA2AFlow({ waitRunId: runId });
         return jsonResult({
           runId,
           status: "accepted",
@@ -359,7 +600,7 @@ export function createSessionsSendTool(opts?: {
         });
       }
       const reply = result.replyText;
-      startA2AFlow(reply ?? undefined);
+      startA2AFlow({ roundOneReply: reply ?? undefined });
 
       return jsonResult({
         runId,

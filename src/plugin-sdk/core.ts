@@ -96,6 +96,8 @@ export type {
   PluginHookReplyDispatchContext,
   PluginHookReplyDispatchEvent,
   PluginHookReplyDispatchResult,
+  PluginHookSessionsSendEvent,
+  PluginHookSessionsSendResult,
 } from "../plugins/types.js";
 export type { OpenClawConfig } from "../config/config.js";
 export type { OutboundIdentity } from "../infra/outbound/identity.js";
