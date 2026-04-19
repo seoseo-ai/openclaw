@@ -36,6 +36,78 @@ export type RunHeartbeatOnceOptions = {
   heartbeat?: { target?: string };
 };
 
+// ── Plugin-facing watchdog timer seam ────────────────────────────
+
+/** A handle returned by {@link PluginWatchdogTimer.scheduleTimeout}. */
+export type PluginTimerHandle = {
+  /** The stable timer identifier passed at scheduling time. */
+  readonly id: string;
+  /** Milliseconds until the callback fires. */
+  readonly timeoutMs: number;
+  /** Whether the timer is still active (not yet elapsed or cancelled). */
+  readonly active: boolean;
+};
+
+/** Callback shape for a scheduled timeout. */
+export type PluginTimerElapsedCallback = () => void | Promise<void>;
+
+/**
+ * Plugin-facing watchdog timer seam for delegated tasks.
+ *
+ * Plugins use this to schedule per-task heartbeat and timeout watchdogs
+ * without importing core timer internals.  The seam guarantees:
+ *
+ * - deterministic cleanup (no orphan timers)
+ * - idempotent cancel
+ * - bulk cancel by owner tag
+ */
+export type PluginWatchdogTimer = {
+  /**
+   * Schedule a one-shot timeout.
+   *
+   * If a timer with the same `id` is already active, the previous one is
+   * cancelled first (re-schedule semantics).
+   *
+   * @param opts.id        Unique timer identifier (plugin-chosen).
+   * @param opts.timeoutMs Delay before `onElapsed` fires.
+   * @param opts.onElapsed Callback invoked when the timer elapses.
+   * @param opts.owner     Optional owner tag for bulk cancel via `cancelAll`.
+   * @returns A handle reflecting the scheduled state.
+   */
+  scheduleTimeout(opts: {
+    id: string;
+    timeoutMs: number;
+    onElapsed: PluginTimerElapsedCallback;
+    owner?: string;
+  }): PluginTimerHandle;
+
+  /**
+   * Cancel a previously scheduled timer.
+   *
+   * No-op if the timer already elapsed, was already cancelled, or never existed.
+   */
+  cancel(id: string): void;
+
+  /**
+   * Query whether a timer is still active.
+   */
+  isActive(id: string): boolean;
+
+  /**
+   * Cancel all timers belonging to a given owner.
+   *
+   * Useful for teardown when a delegated task finishes or fails.
+   */
+  cancelAll(owner: string): void;
+
+  /**
+   * Cancel every active timer regardless of owner.
+   *
+   * Should only be used during process shutdown.
+   */
+  cancelAll(): void;
+};
+
 /** Core runtime helpers exposed to trusted native plugins. */
 export type PluginRuntimeCore = {
   version: string;
@@ -161,6 +233,7 @@ export type PluginRuntimeCore = {
   };
   /** @deprecated Use runtime.tasks.flows for DTO-based TaskFlow access. */
   taskFlow: import("./runtime-taskflow.types.js").PluginRuntimeTaskFlow;
+  timer: PluginWatchdogTimer;
   modelAuth: {
     /** Resolve auth for a model. Only provider/model and optional cfg are used. */
     getApiKeyForModel: (params: {

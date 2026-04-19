@@ -30,6 +30,7 @@ import { createRuntimeMedia } from "./runtime-media.js";
 import { createRuntimeSystem } from "./runtime-system.js";
 import { createRuntimeTaskFlow } from "./runtime-taskflow.js";
 import { createRuntimeTasks } from "./runtime-tasks.js";
+import { createRuntimeTimer } from "./runtime-timer.js";
 import type { CreatePluginRuntimeOptions, PluginRuntime } from "./types.js";
 
 export type { CreatePluginRuntimeOptions } from "./types.js";
@@ -217,6 +218,7 @@ export function createPluginRuntime(_options: CreatePluginRuntimeOptions = {}): 
       _options.allowGatewaySubagentBinding === true,
     ),
     system: createRuntimeSystem(),
+    timer: createRuntimeTimer(),
     media: createRuntimeMedia(),
     webSearch: {
       listProviders: listWebSearchProviders,
