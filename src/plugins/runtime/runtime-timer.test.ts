@@ -25,9 +25,14 @@ describe("createRuntimeTimer", () => {
     expect(handle.active).toBe(true);
     expect(timer.isActive("t1")).toBe(true);
 
-    vi.advanceTimersByTime(5000);
+    vi.advanceTimersByTime(4999);
+    expect(onElapsed).not.toHaveBeenCalled();
+    expect(handle.active).toBe(true);
+
+    vi.advanceTimersByTime(1);
 
     expect(onElapsed).toHaveBeenCalledTimes(1);
+    expect(handle.active).toBe(false);
     expect(timer.isActive("t1")).toBe(false);
   });
 
@@ -43,6 +48,32 @@ describe("createRuntimeTimer", () => {
 
     vi.advanceTimersByTime(5000);
     expect(onElapsed).not.toHaveBeenCalled();
+  });
+
+  it("updates handle.active after cancel and re-schedule", () => {
+    const timer = createRuntimeTimer();
+    const firstHandle = timer.scheduleTimeout({
+      id: "reused-id",
+      timeoutMs: 1000,
+      onElapsed: vi.fn(),
+    });
+
+    timer.cancel("reused-id");
+    expect(firstHandle.active).toBe(false);
+
+    const secondHandle = timer.scheduleTimeout({
+      id: "reused-id",
+      timeoutMs: 2000,
+      onElapsed: vi.fn(),
+    });
+
+    expect(secondHandle.active).toBe(true);
+    timer.scheduleTimeout({
+      id: "reused-id",
+      timeoutMs: 3000,
+      onElapsed: vi.fn(),
+    });
+    expect(secondHandle.active).toBe(false);
   });
 
   it("cancel is a no-op for unknown ids", () => {

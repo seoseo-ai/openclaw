@@ -17,11 +17,13 @@ type ActiveTimer = {
   settled: boolean;
 };
 
-function makeHandle(timer: ActiveTimer, active: boolean): PluginTimerHandle {
+function makeHandle(timer: ActiveTimer): PluginTimerHandle {
   return Object.freeze({
     id: timer.id,
     timeoutMs: timer.timeoutMs,
-    active,
+    get active() {
+      return !timer.settled;
+    },
   });
 }
 
@@ -99,7 +101,7 @@ export function createRuntimeTimer(): PluginWatchdogTimer {
         if (timer) {
           elapsed(timer);
         }
-      }, setTimeout);
+      }, setTimeoutMs);
 
       // Keep the timer handle from keeping the process alive
       if (handle && typeof handle === "object" && "unref" in handle) {
@@ -118,7 +120,7 @@ export function createRuntimeTimer(): PluginWatchdogTimer {
       timers.set(id, timer);
 
       log.debug("timer scheduled", { id, owner, timeoutMs: setTimeoutMs });
-      return makeHandle(timer, true);
+      return makeHandle(timer);
     },
 
     cancel(id: string): void {
