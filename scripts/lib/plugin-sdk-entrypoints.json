@@ -68,6 +68,7 @@
   "secret-ref-runtime",
   "security-runtime",
   "gateway-runtime",
+  "session-run-cancel-runtime",
   "github-copilot-login",
   "github-copilot-token",
   "cli-runtime",

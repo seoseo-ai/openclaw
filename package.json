@@ -328,6 +328,10 @@
       "types": "./dist/plugin-sdk/gateway-runtime.d.ts",
       "default": "./dist/plugin-sdk/gateway-runtime.js"
     },
+    "./plugin-sdk/session-run-cancel-runtime": {
+      "types": "./dist/plugin-sdk/session-run-cancel-runtime.d.ts",
+      "default": "./dist/plugin-sdk/session-run-cancel-runtime.js"
+    },
     "./plugin-sdk/github-copilot-login": {
       "types": "./dist/plugin-sdk/github-copilot-login.d.ts",
       "default": "./dist/plugin-sdk/github-copilot-login.js"

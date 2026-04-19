@@ -1,4 +1,5 @@
 import { isAbortRequestText } from "../auto-reply/reply/abort-primitives.js";
+import { fanOutSessionRunCancel } from "./session-run-cancel-registry.js";
 
 export type ChatAbortControllerEntry = {
   controller: AbortController;
@@ -104,6 +105,7 @@ export function abortChatRunById(
   if (removed?.clientRunId) {
     ops.agentRunSeq.delete(removed.clientRunId);
   }
+  void fanOutSessionRunCancel({ kind: "session_run", sessionKey, runId });
   return { aborted: true };
 }
 

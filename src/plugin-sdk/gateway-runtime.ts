@@ -8,3 +8,11 @@ export {
 } from "../gateway/operator-approvals-client.js";
 export type { EventFrame } from "../gateway/protocol/index.js";
 export type { GatewayRequestHandlerOptions } from "../gateway/server-methods/types.js";
+export {
+  cancelSessionRunTarget,
+  registerDelegatedSessionRunCancelHandler,
+  type SessionRunCancelHandler,
+  type SessionRunCancelHandlerResult,
+  type SessionRunCancelStatus,
+  type SessionRunCancelTarget,
+} from "./session-run-cancel-runtime.js";
