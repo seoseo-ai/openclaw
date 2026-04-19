@@ -520,6 +520,10 @@
       "types": "./dist/plugin-sdk/device-bootstrap.d.ts",
       "default": "./dist/plugin-sdk/device-bootstrap.js"
     },
+    "./plugin-sdk/delegated-wait-run": {
+      "types": "./dist/plugin-sdk/delegated-wait-run.d.ts",
+      "default": "./dist/plugin-sdk/delegated-wait-run.js"
+    },
     "./plugin-sdk/diagnostic-runtime": {
       "types": "./dist/plugin-sdk/diagnostic-runtime.d.ts",
       "default": "./dist/plugin-sdk/diagnostic-runtime.js"

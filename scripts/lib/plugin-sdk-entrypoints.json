@@ -116,6 +116,7 @@
   "compat",
   "direct-dm",
   "device-bootstrap",
+  "delegated-wait-run",
   "diagnostic-runtime",
   "diagnostics-otel",
   "diffs",
