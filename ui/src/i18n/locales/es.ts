@@ -149,6 +149,7 @@ export const es: TranslationMap = {
   tabs: {
     agents: "Agentes",
     overview: "Resumen",
+    a2a: "A2A",
     channels: "Canales",
     instances: "Instancias",
     sessions: "Sesiones",
@@ -170,6 +171,7 @@ export const es: TranslationMap = {
   subtitles: {
     agents: "Gestionar espacios de trabajo, herramientas e identidades de agentes.",
     overview: "Estado de la puerta de enlace, puntos de entrada y lectura rápida de salud.",
+    a2a: "Operator overview and cases.",
     channels: "Gestionar canales y ajustes.",
     instances: "Balizas de presencia de clientes y nodos conectados.",
     sessions: "Inspeccionar sesiones activas y ajustar valores predeterminados por sesión.",

@@ -148,6 +148,7 @@ export const zh_CN: TranslationMap = {
   tabs: {
     agents: "代理",
     overview: "概览",
+    a2a: "A2A",
     channels: "频道",
     instances: "实例",
     sessions: "会话",

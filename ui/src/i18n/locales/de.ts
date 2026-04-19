@@ -152,6 +152,7 @@ export const de: TranslationMap = {
   tabs: {
     agents: "Agenten",
     overview: "Übersicht",
+    a2a: "A2A",
     channels: "Kanäle",
     instances: "Instanzen",
     sessions: "Sitzungen",

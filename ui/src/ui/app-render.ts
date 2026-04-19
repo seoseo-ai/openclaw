@@ -22,6 +22,13 @@ import {
 } from "./app-render.helpers.ts";
 import { warnQueryToken } from "./app-settings.ts";
 import type { AppViewState } from "./app-view-state.ts";
+import {
+  loadA2A,
+  selectA2ACase,
+  setA2AFilters,
+  setA2ASort,
+  setA2AView,
+} from "./controllers/a2a.ts";
 import { loadAgentFileContent, loadAgentFiles, saveAgentFile } from "./controllers/agent-files.ts";
 import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
 import { loadAgentSkills } from "./controllers/agent-skills.ts";
@@ -117,11 +124,12 @@ import {
   updateSkillEdit,
   updateSkillEnabled,
 } from "./controllers/skills.ts";
-import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "./external-link.ts";
 import "./components/dashboard-header.ts";
+import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "./external-link.ts";
 import { icons } from "./icons.ts";
 import { normalizeBasePath, TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation.ts";
 import { isPluginEnabledInConfigSnapshot } from "./plugin-activation.ts";
+import { renderA2A } from "./views/a2a.ts";
 import { agentLogoUrl } from "./views/agents-utils.ts";
 import {
   resolveAgentConfig,
@@ -1438,6 +1446,25 @@ export function renderApp(state: AppViewState) {
                 ${isChat ? renderChatControls(state) : nothing}
               </div>
             </section>`}
+        ${state.tab === "a2a"
+          ? renderA2A({
+              loading: state.a2aDashboardLoading || state.a2aCasesLoading,
+              dashboard: state.a2aDashboard,
+              dashboardError: state.a2aDashboardError,
+              casesResult: state.a2aCasesResult,
+              casesError: state.a2aCasesError,
+              view: state.a2aView,
+              filters: state.a2aFilters,
+              sortColumn: state.a2aSortColumn,
+              sortDir: state.a2aSortDir,
+              selectedCaseId: state.a2aSelectedCaseId,
+              onRefresh: () => loadA2A(state as never, { refresh: true }),
+              onViewChange: (next) => setA2AView(state as never, next),
+              onFiltersChange: (next) => setA2AFilters(state as never, next),
+              onSortChange: (column, dir) => setA2ASort(state as never, column, dir),
+              onSelectCase: (caseId) => selectA2ACase(state as never, caseId),
+            })
+          : nothing}
         ${state.tab === "overview"
           ? renderOverview({
               connected: state.connected,

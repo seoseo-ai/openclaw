@@ -117,6 +117,7 @@ describe("pathForTab", () => {
   it("returns correct path without base", () => {
     expect(pathForTab("chat")).toBe("/chat");
     expect(pathForTab("overview")).toBe("/overview");
+    expect(pathForTab("a2a")).toBe("/a2a");
   });
 
   it("prepends base path", () => {
@@ -129,6 +130,7 @@ describe("tabFromPath", () => {
   it("returns tab for valid path", () => {
     expect(tabFromPath("/chat")).toBe("chat");
     expect(tabFromPath("/overview")).toBe("overview");
+    expect(tabFromPath("/a2a")).toBe("a2a");
     expect(tabFromPath("/sessions")).toBe("sessions");
     expect(tabFromPath("/dreaming")).toBe("dreams");
     expect(tabFromPath("/dreams")).toBe("dreams");
@@ -150,6 +152,7 @@ describe("tabFromPath", () => {
   it("is case-insensitive", () => {
     expect(tabFromPath("/CHAT")).toBe("chat");
     expect(tabFromPath("/Overview")).toBe("overview");
+    expect(tabFromPath("/A2A")).toBe("a2a");
   });
 });
 

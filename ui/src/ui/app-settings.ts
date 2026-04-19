@@ -8,6 +8,7 @@ import {
   stopDebugPolling,
 } from "./app-polling.ts";
 import { scheduleChatScroll, scheduleLogsScroll } from "./app-scroll.ts";
+import { loadA2A, type A2AState } from "./controllers/a2a.ts";
 import { loadAgentFiles, type AgentFilesState } from "./controllers/agent-files.ts";
 import {
   loadAgentIdentities,
@@ -94,6 +95,7 @@ type SettingsHost = {
 };
 
 type SettingsAppHost = SettingsHost &
+  A2AState &
   AgentFilesState &
   AgentIdentityState &
   AgentSkillsState &
@@ -313,6 +315,9 @@ export async function refreshActiveTab(host: SettingsHost) {
       return;
     case "overview":
       await loadOverview(host);
+      return;
+    case "a2a":
+      await loadA2A(app);
       return;
     case "channels":
       await loadChannelsTab(host);

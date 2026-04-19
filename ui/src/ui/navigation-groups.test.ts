@@ -16,6 +16,12 @@ describe("TAB_GROUPS", () => {
     ]);
   });
 
+  it("publishes the a2a control surface in the sidebar and router", () => {
+    const control = TAB_GROUPS.find((group) => group.label === "control");
+    expect(control?.tabs).toContain("a2a");
+    expect(tabFromPath("/a2a")).toBe("a2a");
+  });
+
   it("routes every published settings slice", () => {
     expect(tabFromPath("/communications")).toBe("communications");
     expect(tabFromPath("/appearance")).toBe("appearance");

@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   refreshChatMock: vi.fn(async () => {}),
   scheduleChatScrollMock: vi.fn(),
   scheduleLogsScrollMock: vi.fn(),
+  loadA2AMock: vi.fn(async () => {}),
   loadAgentFilesMock: vi.fn(async () => {}),
   loadAgentIdentitiesMock: vi.fn(async () => {}),
   loadAgentIdentityMock: vi.fn(async () => {}),
@@ -24,6 +25,9 @@ vi.mock("./app-chat.ts", () => ({
 vi.mock("./app-scroll.ts", () => ({
   scheduleChatScroll: mocks.scheduleChatScrollMock,
   scheduleLogsScroll: mocks.scheduleLogsScrollMock,
+}));
+vi.mock("./controllers/a2a.ts", () => ({
+  loadA2A: mocks.loadA2AMock,
 }));
 vi.mock("./controllers/agent-files.ts", () => ({
   loadAgentFiles: mocks.loadAgentFilesMock,
@@ -137,6 +141,15 @@ describe("refreshActiveTab", () => {
     expect(mocks.loadCronRunsMock).toHaveBeenCalledWith(host, "job-123");
     expect(mocks.loadAgentFilesMock).not.toHaveBeenCalled();
     expect(mocks.loadAgentSkillsMock).not.toHaveBeenCalled();
+  });
+
+  it("routes a2a tab refresh through the A2A loader", async () => {
+    const host = createHost();
+    host.tab = "a2a";
+
+    await refreshActiveTab(host as never);
+
+    expect(mocks.loadA2AMock).toHaveBeenCalledOnce();
   });
 
   it("refreshes logs tab by resetting bottom-follow and scheduling scroll", async () => {

@@ -150,6 +150,7 @@ export const uk: TranslationMap = {
   tabs: {
     agents: "Агенти",
     overview: "Огляд",
+    a2a: "A2A",
     channels: "Канали",
     instances: "Екземпляри",
     sessions: "Сеанси",

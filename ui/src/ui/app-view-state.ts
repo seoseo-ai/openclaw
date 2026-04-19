@@ -21,6 +21,9 @@ import type {
   AgentsListResult,
   AgentsFilesListResult,
   AgentIdentityResult,
+  A2ACaseFilterState,
+  A2ADashboardResult,
+  A2ATaskListResult,
   AttentionItem,
   ChannelsStatusSnapshot,
   ConfigSnapshot,
@@ -258,6 +261,17 @@ export type AppViewState = {
   usageSessionLogsLoading: boolean;
   usageSessionLogsExpanded: boolean;
   usageQuery: string;
+  a2aView: "overview" | "cases";
+  a2aDashboardLoading: boolean;
+  a2aDashboard: A2ADashboardResult | null;
+  a2aDashboardError: string | null;
+  a2aCasesLoading: boolean;
+  a2aCasesResult: A2ATaskListResult | null;
+  a2aCasesError: string | null;
+  a2aFilters: A2ACaseFilterState;
+  a2aSortColumn: "updatedAt" | "createdAt" | "status" | "intent" | "targetNodeId";
+  a2aSortDir: "asc" | "desc";
+  a2aSelectedCaseId: string | null;
   usageQueryDraft: string;
   usageQueryDebounceTimer: number | null;
   usageSessionSort: "tokens" | "cost" | "recent" | "messages" | "errors";

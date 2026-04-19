@@ -150,6 +150,7 @@ export const pl: TranslationMap = {
   tabs: {
     agents: "Agenci",
     overview: "Przegląd",
+    a2a: "A2A",
     channels: "Kanały",
     instances: "Instancje",
     sessions: "Sesje",

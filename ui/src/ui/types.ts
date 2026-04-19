@@ -760,3 +760,126 @@ export type AttentionItem = {
   href?: string;
   external?: boolean;
 };
+
+export type A2APartyRef = {
+  sessionKey: string;
+  displayKey?: string;
+  channel?: string;
+};
+
+export type A2ATaskStatus =
+  | "accepted"
+  | "running"
+  | "waiting_reply"
+  | "waiting_external"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "timed_out";
+
+export type A2ATaskDeliveryStatus = "none" | "pending" | "sent" | "skipped" | "failed";
+
+export type A2ATaskListEntry = {
+  taskId: string;
+  correlationId?: string;
+  requester?: A2APartyRef | null;
+  target?: A2APartyRef | null;
+  intent?: string | null;
+  summary?: string | null;
+  status?: string | null;
+  executionStatus?: string | null;
+  deliveryStatus?: string | null;
+  createdAt?: number | null;
+  acceptedAt?: number | null;
+  startedAt?: number | null;
+  heartbeatAt?: number | null;
+  updatedAt?: number | null;
+  completedAt?: number | null;
+  targetNodeId?: string | null;
+  claimedBy?: string | null;
+  waitingReason?: string | null;
+  resultSummary?: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  raw?: Record<string, unknown> | null;
+};
+
+export type A2ATaskListResult = {
+  ts?: number;
+  total?: number;
+  items?: A2ATaskListEntry[];
+  tasks?: A2ATaskListEntry[];
+};
+
+export type A2AQueuePressure = {
+  queued?: number | null;
+  running?: number | null;
+  waitingReply?: number | null;
+  waitingExternal?: number | null;
+  stale?: number | null;
+  oldestAgeMs?: number | null;
+};
+
+export type A2AWorkerHealthEntry = {
+  workerId: string;
+  label?: string | null;
+  status?: string | null;
+  queueDepth?: number | null;
+  activeTasks?: number | null;
+  lastHeartbeatAt?: number | null;
+  targetNodeId?: string | null;
+};
+
+export type A2ARecentOutcomeEntry = {
+  taskId: string;
+  status: string;
+  summary?: string | null;
+  at?: number | null;
+  target?: A2APartyRef | null;
+};
+
+export type A2AAlertEntry = {
+  severity?: string | null;
+  title: string;
+  description?: string | null;
+  taskId?: string | null;
+};
+
+export type A2ADashboardResult = {
+  ts?: number;
+  summary?: {
+    total?: number | null;
+    running?: number | null;
+    waiting?: number | null;
+    failed?: number | null;
+    stale?: number | null;
+    completed24h?: number | null;
+    queueDepth?: number | null;
+    workersHealthy?: number | null;
+    workersUnhealthy?: number | null;
+  };
+  queuePressure?: A2AQueuePressure | null;
+  workerHealth?: {
+    total?: number | null;
+    healthy?: number | null;
+    unhealthy?: number | null;
+    idle?: number | null;
+    entries?: A2AWorkerHealthEntry[];
+  } | null;
+  recentOutcomes?: {
+    completed?: number | null;
+    failed?: number | null;
+    timedOut?: number | null;
+    cancelled?: number | null;
+    items?: A2ARecentOutcomeEntry[];
+  } | null;
+  alerts?: A2AAlertEntry[] | null;
+};
+
+export type A2ACaseFilterState = {
+  query: string;
+  status: string;
+  intent: string;
+  targetNodeId: string;
+  claimedBy: string;
+};

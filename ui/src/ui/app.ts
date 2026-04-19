@@ -56,6 +56,7 @@ import type { AppViewState } from "./app-view-state.ts";
 import { normalizeAssistantIdentity } from "./assistant-identity.ts";
 import { exportChatMarkdown } from "./chat/export.ts";
 import type { ChatSideResult } from "./chat/side-result.ts";
+import { createDefaultA2AFilters, hydrateA2AStateFromLocation } from "./controllers/a2a.ts";
 import {
   loadToolsEffective as loadToolsEffectiveInternal,
   refreshVisibleToolsEffectiveForCurrentSession as refreshVisibleToolsEffectiveForCurrentSessionInternal,
@@ -83,6 +84,8 @@ import type {
   AgentsListResult,
   AgentsFilesListResult,
   AgentIdentityResult,
+  A2ADashboardResult,
+  A2ATaskListResult,
   ConfigSnapshot,
   ConfigUiHints,
   ChatModelOverride,
@@ -140,6 +143,7 @@ export class OpenClawApp extends LitElement {
     if (isSupportedLocale(this.settings.locale)) {
       void i18n.setLocale(this.settings.locale);
     }
+    hydrateA2AStateFromLocation(this as never);
   }
   @state() password = "";
   @state() loginShowGatewayToken = false;
@@ -448,6 +452,19 @@ export class OpenClawApp extends LitElement {
   @state() overviewShowGatewayPassword = false;
   @state() overviewLogLines: string[] = [];
   @state() overviewLogCursor = 0;
+
+  @state() a2aView: "overview" | "cases" = "overview";
+  @state() a2aDashboardLoading = false;
+  @state() a2aDashboard: A2ADashboardResult | null = null;
+  @state() a2aDashboardError: string | null = null;
+  @state() a2aCasesLoading = false;
+  @state() a2aCasesResult: A2ATaskListResult | null = null;
+  @state() a2aCasesError: string | null = null;
+  @state() a2aFilters = createDefaultA2AFilters();
+  @state() a2aSortColumn: "updatedAt" | "createdAt" | "status" | "intent" | "targetNodeId" =
+    "updatedAt";
+  @state() a2aSortDir: "asc" | "desc" = "desc";
+  @state() a2aSelectedCaseId: string | null = null;
 
   @state() skillsLoading = false;
   @state() skillsReport: SkillStatusReport | null = null;

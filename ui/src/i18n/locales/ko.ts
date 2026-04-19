@@ -148,6 +148,7 @@ export const ko: TranslationMap = {
   tabs: {
     agents: "에이전트",
     overview: "개요",
+    a2a: "A2A",
     channels: "채널",
     instances: "인스턴스",
     sessions: "세션",

@@ -152,6 +152,7 @@ export const ja_JP: TranslationMap = {
   tabs: {
     agents: "エージェント",
     overview: "概要",
+    a2a: "A2A",
     channels: "チャンネル",
     instances: "インスタンス",
     sessions: "セッション",

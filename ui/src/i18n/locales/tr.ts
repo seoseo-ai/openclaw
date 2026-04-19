@@ -151,6 +151,7 @@ export const tr: TranslationMap = {
   tabs: {
     agents: "Aracılar",
     overview: "Genel Bakış",
+    a2a: "A2A",
     channels: "Kanallar",
     instances: "Örnekler",
     sessions: "Oturumlar",

@@ -149,6 +149,7 @@ export const id: TranslationMap = {
   tabs: {
     agents: "Agen",
     overview: "Ikhtisar",
+    a2a: "A2A",
     channels: "Saluran",
     instances: "Instans",
     sessions: "Sesi",
